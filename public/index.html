@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Ad-free Page Launcher</title>
+  <style>
+    body{font-family:Inter, Arial, sans-serif;background:#0f1724;color:#e6eef8;padding:28px}
+    .wrap{max-width:1000px;margin:auto}
+    input[type=text]{width:70%;padding:10px;border-radius:8px;border:1px solid rgba(255,255,255,0.06);background:rgba(255,255,255,0.02);color:inherit}
+    button{padding:10px 14px;border-radius:8px;border:none;background:#7c5cff;color:#051226;font-weight:700;cursor:pointer}
+    iframe{width:100%;height:75vh;border-radius:10px;border:1px solid rgba(255,255,255,0.06);margin-top:18px}
+    .notice{color:#98a3b8;margin-top:8px;font-size:13px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Ad-free Page Launcher</h1>
+    <p class="notice">Paste a full URL (https://...) — server will fetch and show a cleaned, ad-free view when possible.</p>
+
+    <div style="display:flex;gap:8px;align-items:center">
+      <input id="url" type="text" placeholder="https://example.com/article/..." />
+      <button id="go">Load</button>
+      <button id="iframeBtn">Open in iframe (if allowed)</button>
+    </div>
+
+    <div id="result"></div>
+    <iframe id="frame" style="display:none"></iframe>
+  </div>
+
+  <script>
+    const goBtn = document.getElementById('go');
+    const iframeBtn = document.getElementById('iframeBtn');
+    const urlInput = document.getElementById('url');
+    const result = document.getElementById('result');
+    const frame = document.getElementById('frame');
+
+    goBtn.addEventListener('click', async () => {
+      const target = urlInput.value.trim();
+      if (!target) return alert('Enter a URL');
+      result.innerHTML = '<div style="padding:12px;background:#0b1220;border-radius:8px;margin-top:12px">Loading…</div>';
+      frame.style.display='none';
+      try {
+        const resp = await fetch('/fetch', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ target })
+        });
+        if (!resp.ok) {
+          const j = await resp.json().catch(()=>null);
+          result.innerHTML = `<div style="padding:12px;background:#3a2a2a;border-radius:8px;margin-top:12px">Error: ${j && j.error ? j.error : resp.statusText}</div>`;
+          return;
+        }
+        const html = await resp.text();
+        // show returned HTML inside a sandboxed iframe for safety
+        const blob = new Blob([html], {type:'text/html'});
+        const blobUrl = URL.createObjectURL(blob);
+        frame.src = blobUrl;
+        frame.style.display = 'block';
+        result.innerHTML = '<div style="margin-top:8px;color:#94a3b8">Rendered in the frame below. Use the "Open original" button inside the page to visit the source.</div>';
+      } catch (e) {
+        result.innerHTML = `<div style="padding:12px;background:#4a2a2a;border-radius:8px;margin-top:12px">Fetch failed: ${e.message}</div>`;
+      }
+    });
+
+    iframeBtn.addEventListener('click', () => {
+      const t = urlInput.value.trim();
+      if (!t) return alert('Enter a URL');
+      // Try to open directly in iframe — many sites will block this.
+      frame.src = t;
+      frame.style.display = 'block';
+      result.innerHTML = '<div style="margin-top:8px;color:#94a3b8">Attempting direct embed (may be blocked by the site).</div>';
+    });
+  </script>
+</body>
+</html>
+
